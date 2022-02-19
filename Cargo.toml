@@ -11,7 +11,10 @@ edition = "2021"
 [dependencies]
 libc = { version = "0.2", default-features = false }
 hashbrown = "0.12.0"
-lazy_static = "1.4.0"    
+dashmap = "5.1.0"
+lazy_static = "1.4.0"
+crossbeam = "0.8.1"
+  
 # we could do it ourself
 # syscall = "0.2.1"
 
