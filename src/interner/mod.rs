@@ -36,6 +36,14 @@ pub trait Interner<T> {
     fn intern(&self, value: T) -> &T;
 }
 
+pub struct HashMapInterner<'a, T>
+where
+    T: Internable,
+    //T: 'static
+{
+    map: Mutex<HashMap<&'a T, &'a T>>,
+}
+
 pub struct HashSetInterner<T>
 where
     T: Internable,
@@ -51,7 +59,6 @@ where
     fn intern(&self, value: T) -> &T {
         match self.set.lock() {
             Ok(mut set) => unsafe {
-                println!("{:#?}", set.len());
                 // the lock sets the lifetime to '_
                 // but i know the set will be around as long as the outer bit
                 // so i transmute it
@@ -121,7 +128,7 @@ mod tests {
         let cool = interned as *const _;
         println!("cool {:?} {}", cool, interned);
 
-        for i in 1..1000 {
+        for i in 1..200_000 {
             intern(format!("intern{}", i));
         }
         println!("cool {:?} {}", cool, interned);
