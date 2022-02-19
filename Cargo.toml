@@ -1,0 +1,30 @@
+# https://github.com/johnthagen/min-sized-rust
+# cargo-features = ["strip"]
+
+[package]
+name = "signaler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = { version = "0.2", default-features = false }
+hashbrown = "0.12.0"
+lazy_static = "1.4.0"    
+# we could do it ourself
+# syscall = "0.2.1"
+
+[build-dependencies]
+libc = "0.2.118"
+
+# [profile.dev]
+# # Must always use panic = "abort" to avoid needing to define the unstable eh_personality lang item.
+# panic = "abort"
+
+# [profile.release]
+# opt-level = "z"   # Optimize for size.
+# lto = true        # Enable Link Time Optimization
+# codegen-units = 1 # Reduce number of codegen units to increase optimizations.
+# panic = "abort"   # Abort on panic
+# strip = true
