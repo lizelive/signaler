@@ -5,6 +5,11 @@ pub mod signal;
 use signal::*;
 pub mod interner;
 pub mod holder;
+mod src;
+
+mod atomic_linked_list;
+mod atomic_non_null;
+mod atomic_boxed;
 
 pub type Pid = libc::pid_t;
 //https://man7.org/linux/man-pages/man2/kill.2.html

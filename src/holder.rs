@@ -2,6 +2,7 @@ use std::{
     cell::{Cell, RefCell, UnsafeCell},
     intrinsics::transmute,
     mem::MaybeUninit,
+    ops::DerefMut,
     pin::Pin,
     ptr::NonNull,
     sync::{
@@ -128,25 +129,7 @@ impl<T> BlockHolder<T> {
     }
 }
 
-//https://docs.rs/arc-swap/latest/arc_swap/
-#[repr(transparent)]
-pub struct AtomicArc<T> {
-    internal: AtomicBox<Arc<T>>,
-}
 
-impl<T> AtomicArc<T> {
-    pub fn try_chain<F>(&self, next: F) -> Result<Arc<T>, Arc<T>>
-    where
-        F: FnOnce(Arc<T>) -> T,
-    {
-        let out = self
-            .internal
-            .try_apply(|last| Arc::new(next(last.clone())))
-            .map(|x| x.deref().clone())
-            .map_err(|x| x.deref().clone());
-        out
-    }
-}
 
 // would be better as AtomicArc
 #[repr(transparent)]
@@ -159,6 +142,10 @@ impl<T> AtomicBox<T> {
         Self {
             ptr: AtomicPtr::new(Box::into_raw(Box::new(from))),
         }
+    }
+
+    pub fn raw(&self) -> *mut T {
+        self.ptr.load(Ordering::Relaxed)
     }
 
     pub fn compare_exchange(&self, start_raw: *mut T, next_box: Box<T>) -> Result<Box<T>, Box<T>> {
@@ -175,43 +162,22 @@ impl<T> AtomicBox<T> {
 
     pub fn try_apply<F>(&self, next: F) -> Result<Box<T>, Box<T>>
     where
-        F: FnOnce(&T) -> T,
+        F: FnOnce(*mut T) -> T,
     {
-        let start_raw = {
-            let ref this = self;
-            this.ptr.load(Ordering::Relaxed)
-        };
-        let start_ref = unsafe { start_raw.as_ref().unwrap() };
-        let next = next(start_ref);
+        //let start_ref = self.deref_mut();
+        let start_raw = self.raw();
+        // this is unsafe. what if apply at same time, but first one next takes longer to
+        //let start_ref = unsafe { start_raw.as_ref().unwrap() };
+        let next = next(start_raw);
         let next_box = Box::new(next);
         self.compare_exchange(start_raw, next_box)
     }
-
-    // unsafe fn try_chain_box<F>(&self, next: F, undo: F) -> bool
-    // where
-    //     F: FnOnce(Box<T>) -> Box<T>,
-    // {
-    //     let start_raw = self.raw();
-    //     let start_box = unsafe { self.as_box() };
-    //     let next_box = next(start_box);
-    //     let next_raw = Box::into_raw(next_box);
-    //     let echange =
-    //         self.ptr
-    //             .compare_exchange(start_raw, next_raw, Ordering::SeqCst, Ordering::Relaxed);
-    //     if echange.is_err() {
-    //         let next_box = unsafe { Box::from_raw(next_raw) };
-    //         let returned_box = undo(next_box);
-    //         assert_eq!(
-    //             start_raw, returned_raw,
-    //             "undo needs to return the box they where given for next"
-    //         );
-    //         // don't loose the
-    //         let returned_raw = Box::into_raw(returned_box);
-    //         false
-    //     } else {
-    //         true
-    //     }
-    // }
+}
+impl<T> std::ops::DerefMut for AtomicBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let raw = self.ptr.load(Ordering::Relaxed);
+        unsafe { raw.as_mut() }.unwrap()
+    }
 }
 
 impl<T> std::ops::Deref for AtomicBox<T> {
@@ -225,6 +191,8 @@ impl<T> std::ops::Deref for AtomicBox<T> {
 
 impl<T> Drop for AtomicBox<T> {
     fn drop(&mut self) {
-        drop(unsafe { self.as_box() })
+        let raw = self.raw();
+        let boxed = unsafe { Box::from_raw(raw) };
+        drop(boxed)
     }
 }
